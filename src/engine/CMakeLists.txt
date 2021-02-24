@@ -37,6 +37,11 @@ if (MSVC)
 	set(CMAKE_CXX_FLAGS "$(CMAKE_CXX_FLAGS) /EHsc")
 endif()
 
+# For Unix, tell gcc to use c++11.
+if (MINGW)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -D_POSIX_C_SOURCE")
+endif()
+
 add_executable(ga ${GA_SOURCE_FILES} always_copy_data.h)
 target_link_libraries(ga SDL2 SDL2main SDL2test glew32s opengl32)
 if (MSVC)
