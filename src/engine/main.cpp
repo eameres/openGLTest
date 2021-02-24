@@ -116,7 +116,6 @@ Uint32 my_callbackfunc(Uint32 interval, void* param)
 }
 
 int main(void) {
-    GLint attribute_coord2d;
     GLuint program, vbo[4], vao;
     SDL_Event event;
     SDL_GLContext gl_context;
@@ -133,7 +132,6 @@ int main(void) {
 
     /* Shader setup. */
     program = common_get_shader_program(vertex_shader_source, fragment_shader_source);
-    attribute_coord2d = glGetAttribLocation(program, "coord2d");
 
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
@@ -158,12 +156,6 @@ int main(void) {
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
 
-
-    glPolygonMode(GL_FRONT, GL_FILL);
-    glPolygonMode(GL_BACK, GL_FILL);
-
-    glPolygonMode(GL_FRONT, GL_LINE);
-    glPolygonMode(GL_BACK, GL_LINE);
     /* Main loop. */
     while (1) {
         glClear(GL_COLOR_BUFFER_BIT);
@@ -176,7 +168,7 @@ int main(void) {
             glPolygonMode(GL_FRONT, GL_FILL);
             glPolygonMode(GL_BACK, GL_FILL);
         }
-
+        glBindVertexArray(vao);
         glDrawElements(GL_TRIANGLES, 9, GL_UNSIGNED_SHORT, (void*)0);
 
         SDL_GL_SwapWindow(window);
