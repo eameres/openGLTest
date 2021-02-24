@@ -39,17 +39,18 @@ static const GLchar* fragment_shader_source =
 "#version 400\n"
 "layout(location = 0) out vec4 myColor;\n"
 "uniform vec4 eColor;\n"
+"uniform int mode;\n"
 "uniform sampler2D u_texture;\n"
 "in vec2 fragmentUV;\n"
 "in vec4 interpColor;\n"
 "void main() {\n"
-//"    myColor = vec4(1.0, 0.0, 0.0, 1.0);\n"     // this version uses a fixed color
-//"    myColor = interpColor;\n"     // this version uses an interpolated color
-//"    myColor = eColor;\n"                         // this version pulls changing color from uniform
-"    myColor = texture(u_texture, fragmentUV);\n"   // this version pulls color from texture
+"    if (mode == 0) myColor = vec4(1.0, 0.0, 0.0, 1.0);\n"     // this version uses a fixed color
+"    if (mode == 1) myColor = interpColor;\n"     // this version uses an interpolated color
+"    if (mode == 2) myColor = eColor;\n"                         // this version pulls changing color from uniform
+"    if (mode == 3) myColor = texture(u_texture, fragmentUV);\n"   // this version pulls color from texture
 "}\n";
 
-static GLfloat vertices[] = {
+static GLfloat positionCoordinates[] = {
     -0.4,  0.4,
     -0.8, -0.4,
      0.0, -0.4,
@@ -173,7 +174,7 @@ int main(int argc, const char** argv)
 
     set_root_path(argv[0]);
 
-    GLuint program, vbo[4], vao, eLoc, tHandle,tLoc;
+    GLuint program, vbo[4], vao, eLoc, tHandle[2], tLoc, mLoc;
     SDL_Event event;
     SDL_GLContext gl_context;
     SDL_Window* window;
@@ -181,6 +182,7 @@ int main(int argc, const char** argv)
     GLfloat colorVecBlue[] = { 0.0,0.0,1.0,1.0 };
     GLfloat colorVecRed[] = { 1.0,0.0,0.0,1.0 };
 
+    // first we need to set up SLD and glew 
     SDL_Init(SDL_INIT_TIMER | SDL_INIT_VIDEO);
 
     my_timer_id = SDL_AddTimer(1000, my_callbackfunc, 0);
@@ -190,75 +192,130 @@ int main(int argc, const char** argv)
     gl_context = SDL_GL_CreateContext(window);
     glewInit();
 
-    /* Shader setup. */
+    // done with "global system stuff"
+
+    /* Shader setup. create a program from a vertex and fragment shader combo */
     program = common_get_shader_program(vertex_shader_source, fragment_shader_source);
 
-    tHandle = texture_from_file("data/textures/magic.png");
-
+    /* Vertex Array Object setup. */
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
 
-    /* Buffer setup. */
+    /* Vertex Buffer setup. */
     glGenBuffers(3, vbo);
 
+    // first buffer... positions of the vertices
     glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(positionCoordinates), positionCoordinates, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glEnableVertexAttribArray(0);
 
+    // second buffer... UV coordinates for texturing (or other games)
     glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
     glBufferData(GL_ARRAY_BUFFER, sizeof(uv), uv, GL_STATIC_DRAW);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glBindBuffer(GL_ARRAY_BUFFER, 1);
+    glEnableVertexAttribArray(1);
 
+    // third buffer, indices for the vertices used in the geometry
+    // notice that we are creating 3 triangles with only 5 vertices ! (some triangles share vertices)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[2]);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, 2);
+
+    // tell OpenGL to use our shader program
+    glUseProgram(program); 
 
     /* Global draw state */
-    glUseProgram(program);
     glViewport(0, 0, WIDTH, HEIGHT);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
     
+    // the "uniform variables" are used to send data shared by ALL vertices to the shaders
+
     /* send the color as a uniform vec4 */
     eLoc = glGetUniformLocation(program, "eColor");
+    glUniform4fv(eLoc, 1, colorVecBlue); 
+    
+    // which texture unit to use (different from which texture to use)
     tLoc = glGetUniformLocation(program, "u_texture");
-
-    glUniform4fv(eLoc, 1, colorVecBlue);
-
     glUniform1i(tLoc, 0); // 0: GL_TEXTURE0
+
+    // select between our custom fragment shader modes
+    mLoc = glGetUniformLocation(program, "mode");
+    glUniform1i(mLoc, 0); // "mode 0"
+
+    // set up 2 textures
+
+    tHandle[0] = texture_from_file("data/textures/magic.png");
+    tHandle[1] = texture_from_file("data/textures/brillo.png");
+
+    // set the  fill modes for polygons
+
+    glPolygonMode(GL_FRONT, GL_FILL);
+    glPolygonMode(GL_BACK, GL_FILL);
 
     /* Main loop. */
     while (1) {
-        glClear(GL_COLOR_BUFFER_BIT);
 
-        if (foo & 1) {
-            glPolygonMode(GL_FRONT, GL_LINE);
-            glPolygonMode(GL_BACK, GL_LINE);
-            glUniform4fv(eLoc, 1, colorVecBlue);
-        }
-        else {
-            glPolygonMode(GL_FRONT, GL_FILL);
-            glPolygonMode(GL_BACK, GL_FILL);
-            glUniform4fv(eLoc, 1, colorVecRed);
+        glClear(GL_COLOR_BUFFER_BIT); // clear the background on each iteration
+
+        //  I set up a few "modes" to switch between showing off different renders based on the same vao and vbos
+        switch (foo & 3) {
+            case 0:
+                glUniform1i(mLoc, 3); // mode 3 : use texture
+                 glBindTexture(GL_TEXTURE_2D, tHandle[0]);
+
+                 glPolygonMode(GL_FRONT, GL_FILL);
+                 glPolygonMode(GL_BACK, GL_FILL);
+
+                break;
+            case 1:
+                glUniform1i(mLoc, 3); // mode 3 : use texture
+                glBindTexture(GL_TEXTURE_2D, tHandle[1]);
+                
+                glPolygonMode(GL_FRONT, GL_FILL);
+                glPolygonMode(GL_BACK, GL_FILL);
+
+                break;
+            case 2:
+                glUniform1i(mLoc, 0); // mode 0 : use hardcoded color
+
+                glPolygonMode(GL_FRONT, GL_LINE);
+                glPolygonMode(GL_BACK, GL_LINE);
+                
+                break;
+            case 3:
+                glUniform1i(mLoc, 2); // mode 2 : use specified color
+                glUniform4fv(eLoc, 1, colorVecBlue);
+
+                // to get fancy we decrement the blue channel to "pulse"
+                colorVecBlue[2] -= .01;
+                if (colorVecBlue[2] < 0)
+                    colorVecBlue[2] = 1.0;
+
+                glPolygonMode(GL_FRONT, GL_FILL);
+                glPolygonMode(GL_BACK, GL_FILL);
+
+                break;
+            default:
+                break;
         }
 
+        /* here's where we actually trigger the rendering, yup, just these few lines! */
         glBindVertexArray(vao);
         glDrawElements(GL_TRIANGLES, 9, GL_UNSIGNED_SHORT, (void*)0);
 
+        /* SDL needs to do a window buffer swap */
         SDL_GL_SwapWindow(window);
+
+        /* a bit of user interface housekeeping */
         if (SDL_PollEvent(&event) && event.type == SDL_QUIT)
-            break;
+            break; // QUIT!!
     }
 
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);
 
     /* Cleanup. */
-    glDeleteTextures(1, &tHandle);
+    glDeleteTextures(2, tHandle);
     glDeleteBuffers(2, vbo);
     glDeleteVertexArrays(1, &vao);
 
