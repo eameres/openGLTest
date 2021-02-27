@@ -96,7 +96,7 @@ GLfloat myMvp90[4][4] = { { 0, 1, 0, 0 }, { -1, 0, 0, 0 }, { 0, 0, 1, 0 }, { 0, 
 
 /* load a texture from a file using STB */
 /* it is assumed that the path needs to have the executable's location prepended */
-GLuint texture_from_file(const char* path)
+GLuint texture_from_file(const char* path,GLuint textureUnit)
 {
     /* first up, resolve the path according to the executable */
     extern char g_root_path[256];
@@ -116,8 +116,11 @@ GLuint texture_from_file(const char* path)
     /* finally generate a texture, bind it, describe it, and load the image into it */
     GLuint handle;
 
+    glActiveTexture(GL_TEXTURE0 + textureUnit);
+
     glGenTextures(1, &handle);
     glBindTexture(GL_TEXTURE_2D, handle);
+    
     glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, width, height);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data);
 
@@ -190,8 +193,7 @@ Uint32 my_callbackfunc(Uint32 interval, void* param)
 {
     // using this as a hack to flash between filled and unfilled triangles
     foo++;
-    my_timer_id = SDL_AddTimer(1000, my_callbackfunc, 0);
-    return Uint32();
+    return interval;
 }
 
 static void set_root_path(const char* exepath);
@@ -203,6 +205,7 @@ int main(int argc, const char** argv)
 
     GLuint program, basicProgram;   // shader program handles
     GLuint tHandle[2];              // texture handles
+    GLuint textureUnit = GL_TEXTURE0; // just using single texture unit
 
     GLuint vbo[4], vao;             // Vertex Array and Vertex Buffer Object handles
     
@@ -215,15 +218,18 @@ int main(int argc, const char** argv)
     GLfloat colorVecBlue[] = { 0.0,0.0,1.0,1.0 };   // blue
     GLfloat colorVecRed[] = { 1.0,0.0,0.0,1.0 };    // red
 
-    // first we need to set up SLD and glew 
-    SDL_Init(SDL_INIT_TIMER | SDL_INIT_VIDEO);
-
-    my_timer_id = SDL_AddTimer(1000, my_callbackfunc, 0); // use an SDL 1 second time to "animate" modes
-
+    // first we need to set up SLD and glew     
+    if (SDL_Init(SDL_INIT_TIMER | SDL_INIT_VIDEO) != 0) {
+        SDL_Log("Unable to initialize SDL: %s", SDL_GetError());
+       return 1;
+    }
+    
     window = SDL_CreateWindow(__FILE__, 0, 0,
         WIDTH, HEIGHT, SDL_WINDOW_OPENGL);
     gl_context = SDL_GL_CreateContext(window);
     glewInit();
+    
+    my_timer_id = SDL_AddTimer(500, my_callbackfunc, 0); // use an SDL 1 second time to "animate" modes
 
     // done with "global system stuff"
 
@@ -286,8 +292,8 @@ int main(int argc, const char** argv)
 
     // set up 2 textures
 
-    tHandle[0] = texture_from_file("data/textures/magic.png");
-    tHandle[1] = texture_from_file("data/textures/brillo.png");
+    tHandle[0] = texture_from_file("data/textures/magic.png",0);
+    tHandle[1] = texture_from_file("data/textures/brillo.png",1);
 
     // set the  fill modes for polygons
     glPolygonMode(GL_FRONT, GL_FILL);
@@ -309,8 +315,16 @@ int main(int argc, const char** argv)
         //  based on the same vao and vbos with some tweaks to shader uniforms and glPolygonMode
         switch (foo & 3) {
             case 0:
-                glUniform1i(mLoc, 3); // mode 3 : use texture
-                 glBindTexture(GL_TEXTURE_2D, tHandle[0]);
+                 glUniform1i(mLoc, 3); // mode 3 : use texture
+
+                 // if using multiple texture units, no need to rebind
+                 glUniform1i(tLoc, 0); // 0: GL_TEXTURE0 <- texture unit #0, GPU has at least one!
+                 
+                 // when using a single texture unit...
+
+                 //glUniform1i(tLoc, 0); // 0: GL_TEXTURE0 <- texture unit #0, GPU has at least one!
+                 //glActiveTexture(textureUnit);
+                 //glBindTexture(GL_TEXTURE_2D, tHandle[0]); // partial hint #3 for textures...
 
                  glPolygonMode(GL_FRONT, GL_FILL);
                  glPolygonMode(GL_BACK, GL_FILL);
@@ -318,7 +332,15 @@ int main(int argc, const char** argv)
                 break;
             case 1:
                 glUniform1i(mLoc, 3); // mode 3 : use texture
-                glBindTexture(GL_TEXTURE_2D, tHandle[1]);
+
+                // if using multiple texture units, no need to rebind
+                glUniform1i(tLoc, 1); // 1: GL_TEXTURE1 <- texture unit #1, GPU has at least one!
+                
+                // when using a single texture unit...
+
+                //glUniform1i(tLoc, 0); // 0: GL_TEXTURE0 <- texture unit #0, GPU has at least one!
+                //glActiveTexture(textureUnit);
+                //glBindTexture(GL_TEXTURE_2D, tHandle[1]); // partial hint #3 for textures...
                 
                 glPolygonMode(GL_FRONT, GL_FILL);
                 glPolygonMode(GL_BACK, GL_FILL);
