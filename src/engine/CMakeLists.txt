@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.6)
-project (myOpenGL)
+project (ga3)
 
 # SDL: for windowing and input:
 set(SDL_AUDIO_ENABLED_BY_DEFAULT OFF)
@@ -8,25 +8,24 @@ set(SDL_DLOPEN_ENABLED_BY_DEFAULT OFF)
 set(SDL_FILE_ENABLED_BY_DEFAULT OFF)
 set(SDL_FILESYSTEM_ENABLED_BY_DEFAULT OFF)
 set(SDL_RENDER_ENABLED_BY_DEFAULT OFF)
-set(SDL_THREADS_ENABLED_BY_DEFAULT OFF)
-set(SDL_TIMER_ENABLED_BY_DEFAULT OFF)
+set(SDL_THREADS_ENABLED_BY_DEFAULT ON)
+set(SDL_TIMER_ENABLED_BY_DEFAULT ON)
 set(SDL_SHARED_ENABLED_BY_DEFAULT OFF)
 set(SDL_STATIC_ENABLED_BY_DEFAULT OFF)
 
-#add_subdirectory (${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/SDL2-2.0.7 ${PROJECT_BINARY_DIR}/SDL2-2.0.7)
-#include_directories ("${PROJECT_BINARY_DIR}/SDL2-2.0.9/include")
-include_directories ("${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/SDL2-2.0.9/include")
-link_directories ("${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/SDL2-2.0.9/lib/x64")
+add_subdirectory (${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/SDL2-2.0.14 ${PROJECT_BINARY_DIR}/SDL2-2.0.14)
+include_directories ("${PROJECT_BINARY_DIR}/SDL2-2.0.14/include")
+include_directories ("${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/SDL2-2.0.14/include")
 
 # STB: for image loading and font:
 include_directories ("${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/stb")
 
 # GLEW: for OpenGL loading:
-set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glew-2.1.0")
-set(CMAKE_LIBRARY_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glew-2.1.0/lib/Release/x64")
+set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glew-2.0.0")
+set(CMAKE_LIBRARY_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glew-2.0.0/lib/Release/x64")
 find_package(GLEW REQUIRED)
 include_directories (${GLEW_INCLUDE_DIRS})
-link_directories ("${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glew-2.1.0/lib/Release/x64")
+link_directories ("${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glew-2.0.0/lib/Release/x64")
 
 # GA framework and homeworks:
 include_directories ("${CMAKE_CURRENT_SOURCE_DIR}")
@@ -43,7 +42,7 @@ if (MINGW)
 endif()
 
 add_executable(ga ${GA_SOURCE_FILES} always_copy_data.h)
-target_link_libraries(ga SDL2 SDL2main SDL2test glew32s opengl32)
+target_link_libraries(ga SDL2-static glew32s opengl32)
 if (MSVC)
 	set_target_properties(ga PROPERTIES LINK_FLAGS "/ignore:4098 /ignore:4099")
 endif()
@@ -52,5 +51,3 @@ add_custom_target(ALWAYS_COPY_DATA COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CUR
 add_dependencies(ga ALWAYS_COPY_DATA)
 
 add_custom_command(TARGET ga POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../../data $<TARGET_FILE_DIR:ga>/data)
-
-add_custom_command(TARGET ga POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/SDL2-2.0.9/lib/x64/SDL2.dll $<TARGET_FILE_DIR:ga>)
